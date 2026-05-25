@@ -1,0 +1,202 @@
+import json, os, time, hashlib, secrets
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+DATA_FILE = '/home/user/work/allosh_data.json'
+USERS_FILE = '/home/user/work/allosh_users.json'
+TOKENS = {}
+
+def load_json(path, default):
+    try:
+        with open(path) as f: return json.load(f)
+    except: return default
+
+def save_json(path, data):
+    with open(path, 'w') as f: json.dump(data, f)
+
+def hash_pw(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+# Init default admin user
+if not os.path.exists(USERS_FILE):
+    save_json(USERS_FILE, [{"username": "admin", "password": hash_pw("admin123"), "role": "admin"}])
+
+if not os.path.exists(DATA_FILE):
+    save_json(DATA_FILE, {})
+
+with open('/home/user/work/allosh_v2.html') as f:
+    HTML = f.read()
+
+# Build manifest with base64 icons
+import base64
+with open('/home/user/work/icons/icon-192.png','rb') as f: i192 = base64.b64encode(f.read()).decode()
+with open('/home/user/work/icons/icon-512.png','rb') as f: i512 = base64.b64encode(f.read()).decode()
+ICON192 = base64.b64decode(i192)
+ICON512 = base64.b64decode(i512)
+MANIFEST = json.dumps({
+    "name": "Allosh", "short_name": "Allosh",
+    "start_url": "/", "display": "standalone",
+    "background_color": "#0a0a1a", "theme_color": "#6366f1",
+    "icons": [
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+    ]
+})
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+
+    def send_json(self, code, data):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header('Content-Type','application/json')
+        self.send_header('Content-Length', len(body))
+        self.send_header('Access-Control-Allow-Origin','*')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def get_token(self):
+        auth = self.headers.get('Authorization','')
+        if auth.startswith('Bearer '): return auth[7:]
+        return None
+
+    def get_user(self):
+        tok = self.get_token()
+        return TOKENS.get(tok)
+
+    def read_body(self):
+        l = int(self.headers.get('Content-Length', 0))
+        return json.loads(self.rfile.read(l)) if l else {}
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin','*')
+        self.send_header('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS')
+        self.send_header('Access-Control-Allow-Headers','Content-Type,Authorization')
+        self.end_headers()
+
+    def do_GET(self):
+        p = urlparse(self.path).path
+        qs = parse_qs(urlparse(self.path).query)
+
+        if p == '/':
+            body = HTML.encode()
+            self.send_response(200)
+            self.send_header('Content-Type','text/html; charset=utf-8')
+            self.send_header('Content-Length', len(body))
+            self.end_headers()
+            self.wfile.write(body)
+
+        elif p == '/manifest.json':
+            body = MANIFEST.encode()
+            self.send_response(200)
+            self.send_header('Content-Type','application/manifest+json')
+            self.send_header('Content-Length', len(body))
+            self.end_headers()
+            self.wfile.write(body)
+
+        elif p == '/icon-192.png':
+            self.send_response(200)
+            self.send_header('Content-Type','image/png')
+            self.send_header('Content-Length', len(ICON192))
+            self.end_headers()
+            self.wfile.write(ICON192)
+
+        elif p == '/icon-512.png':
+            self.send_response(200)
+            self.send_header('Content-Type','image/png')
+            self.send_header('Content-Length', len(ICON512))
+            self.end_headers()
+            self.wfile.write(ICON512)
+
+        elif p == '/sw.js':
+            body = b"self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));"
+            self.send_response(200)
+            self.send_header('Content-Type','application/javascript')
+            self.send_header('Content-Length', len(body))
+            self.end_headers()
+            self.wfile.write(body)
+
+        elif p == '/api/me':
+            u = self.get_user()
+            if not u: self.send_json(401, {'error': 'Not authenticated'})
+            else: self.send_json(200, {'username': u['username'], 'role': u['role']})
+
+        elif p == '/api/data':
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            target = qs.get('user', [None])[0]
+            if target and u['role'] == 'admin': key = target
+            else: key = u['username']
+            db = load_json(DATA_FILE, {})
+            self.send_json(200, db.get(key, {'devices': []}))
+
+        elif p == '/api/users':
+            u = self.get_user()
+            if not u or u['role'] != 'admin': return self.send_json(403, {'error': 'Forbidden'})
+            users = load_json(USERS_FILE, [])
+            db = load_json(DATA_FILE, {})
+            result = []
+            for usr in users:
+                udb = db.get(usr['username'], {'devices': []})
+                tasks = sum(len(g.get('tasks',[])) for d in udb.get('devices',[]) for s in d.get('sites',[]) for g in s.get('games',[]))
+                result.append({'username': usr['username'], 'role': usr['role'], 'devices': len(udb.get('devices',[])), 'tasks': tasks})
+            self.send_json(200, result)
+        else:
+            self.send_json(404, {'error': 'Not found'})
+
+    def do_POST(self):
+        p = urlparse(self.path).path
+        body = self.read_body()
+
+        if p == '/api/login':
+            users = load_json(USERS_FILE, [])
+            u = next((x for x in users if x['username'] == body.get('username') and x['password'] == hash_pw(body.get('password',''))), None)
+            if not u: return self.send_json(401, {'error': 'Wrong username or password'})
+            tok = secrets.token_hex(32)
+            TOKENS[tok] = {'username': u['username'], 'role': u['role']}
+            self.send_json(200, {'token': tok, 'username': u['username'], 'role': u['role']})
+
+        elif p == '/api/logout':
+            tok = self.get_token()
+            if tok: TOKENS.pop(tok, None)
+            self.send_json(200, {'ok': True})
+
+        elif p == '/api/data':
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            db = load_json(DATA_FILE, {})
+            db[u['username']] = body
+            save_json(DATA_FILE, db)
+            self.send_json(200, {'ok': True})
+
+        elif p == '/api/users':
+            u = self.get_user()
+            if not u or u['role'] != 'admin': return self.send_json(403, {'error': 'Forbidden'})
+            users = load_json(USERS_FILE, [])
+            if any(x['username'] == body.get('username') for x in users):
+                return self.send_json(400, {'error': 'User already exists'})
+            users.append({'username': body['username'], 'password': hash_pw(body['password']), 'role': 'user'})
+            save_json(USERS_FILE, users)
+            self.send_json(200, {'ok': True})
+        else:
+            self.send_json(404, {'error': 'Not found'})
+
+    def do_DELETE(self):
+        p = urlparse(self.path).path
+        u = self.get_user()
+        if not u or u['role'] != 'admin': return self.send_json(403, {'error': 'Forbidden'})
+        if p.startswith('/api/users/'):
+            username = p.split('/')[-1]
+            if username == 'admin': return self.send_json(400, {'error': 'Cannot delete admin'})
+            users = load_json(USERS_FILE, [])
+            users = [x for x in users if x['username'] != username]
+            save_json(USERS_FILE, users)
+            self.send_json(200, {'ok': True})
+        else:
+            self.send_json(404, {'error': 'Not found'})
+
+if __name__ == '__main__':
+    server = HTTPServer(('0.0.0.0', 8090), Handler)
+    print('Allosh v2 running on port 8090')
+    server.serve_forever()
