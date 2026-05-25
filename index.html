@@ -191,6 +191,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .id-btn{background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 7px;color:#7dd3fc;transition:all .12s;line-height:1}
 .id-btn:hover{background:rgba(56,189,248,0.2);color:#fff}
 .id-btn.saved{color:#4ade80;border-color:rgba(74,222,128,0.4);background:rgba(74,222,128,0.1)}
+@keyframes pulse-install{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.5)}50%{box-shadow:0 0 0 6px rgba(99,102,241,0)}}
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
@@ -225,7 +226,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="htag">Track · Earn · Win</div>
     </div>
     <div class="hbtns">
-      <button class="hbtn" id="btn-install" onclick="installApp()" title="Install App">📲</button>
+      <button class="hbtn" id="btn-install" onclick="installApp()" title="تنزيل التطبيق" style="background:linear-gradient(135deg,#4f46e5,#6366f1);border-color:transparent;color:#fff;animation:pulse-install 2s ease-in-out infinite">⬇️ تنزيل</button>
       <button class="hbtn" onclick="openAdmin()">⚙️</button>
       <a href="https://t.me/Ali1996Shaedar" target="_blank" class="hbtn tg">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 13.617l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.828.942z"/></svg>
@@ -878,14 +879,19 @@ window.addEventListener('appinstalled', () => {
 function installApp() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+    deferredPrompt.userChoice.then(choice => {
+      deferredPrompt = null;
+      if (choice.outcome === 'accepted') {
+        document.getElementById('btn-install').style.animation = 'none';
+        document.getElementById('btn-install').textContent = '✅ تم التنزيل';
+      }
+    });
   } else {
-    // Show manual instructions
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (isIOS) {
-      alert('iOS: اضغط Share ثم "Add to Home Screen"\niOS: Tap Share → Add to Home Screen');
+      alert('📲 iOS:\nاضغط زر المشاركة Share ثم\n"Add to Home Screen" ← إضافة للشاشة الرئيسية');
     } else {
-      alert('Android/Chrome: اضغط ⋮ ثم "Add to Home Screen"\nAndroid/Chrome: Menu ⋮ → Add to Home Screen');
+      alert('📲 Android / Chrome:\nاضغط ⋮ (القائمة) ثم\n"Add to Home Screen" ← إضافة للشاشة الرئيسية');
     }
   }
 }
