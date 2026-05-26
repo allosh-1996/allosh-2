@@ -268,13 +268,12 @@ class Handler(BaseHTTPRequestHandler):
             payload = body.get('payload', {})
             if not url or not payload:
                 return self.send_json(400, {'error': 'Missing url or payload'})
-            print(f'[MGS] URL: {url}')
+            import sys
+            print(f'[MGS] URL: {url}', flush=True)
             if payload.get('events'):
                 ev = payload['events'][0]
-                print(f'[MGS] appsFlyerId: {ev.get("appsFlyerId","")}')
-                print(f'[MGS] uuid/idfa: {ev.get("uuid","")}')
-                print(f'[MGS] apiKey: {str(ev.get("apiKey",""))[:20]}...')
-                print(f'[MGS] levelNumber: {ev.get("levelNumber","")}')
+                print(f'[MGS] FULL EVENT: {json.dumps(ev)}', flush=True)
+                sys.stdout.flush()
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode(),

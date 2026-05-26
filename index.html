@@ -1068,10 +1068,16 @@ async function sendMPEvent(eventName, level, distinctId, deviceId) {
 const MP_TOKEN = '584b45f0bcfdb3605143a47f5f7ac520';
 
 async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
-  const idfv   = ids.idfv   || idfa;
-  const iosver = ids.iosver || '16.7.12';
-  const gameId = 'e203c8df-df50-4a5d-a6ba-2cc8ac5c3a30';
-  const now       = Date.now();
+  const idfv        = ids.idfv   || idfa;
+  const iosver      = ids.iosver || '16.7.12';
+  const swId        = ids.swId   || '';
+  const convData    = ids.conversionData || '';
+  const unityIdfi   = ids.unityIdfi   || '';
+  const unityPId    = ids.unityPlayerId || '';
+  const unityUId    = ids.unityUserId  || '';
+  const installDate = ids.installDate  || '';
+  const gameId      = 'e203c8df-df50-4a5d-a6ba-2cc8ac5c3a30';
+  const now         = Date.now();
 
   function genUUID(upper) {
     const u = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -1081,43 +1087,87 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
     return upper ? u.toUpperCase() : u;
   }
 
-  const sessionDur    = Math.floor(Math.random() * 20) + 20;
+  const sessionDur    = Math.floor(Math.random() * 25) + 20;
   const gameSessionId = genUUID(false);
   const sessionId     = genUUID(true);
   const megaSessionId = genUUID(true);
+  const megaCounter   = Math.floor(Math.random() * 5) + 8;
+  const sessCounter   = megaCounter + 1;
+  const totalPlaytime = Math.floor(Math.random() * 300) + 800;
 
   const event = {
+    abId: '', abName: '', abVariant: '',
+    activeDay: 2,
+    adsFreeZoneEnabled: 0,
+    adsLtv: 'aoCCpb3hjpriAE76peh64U84ULaKLmKitx7uKY5/V4A=',
     apiKey:      devKey,
     appsFlyerId: afId,
-    uuid:        idfa,
-    idfv:        idfv,
+    attempt: 1,
+    attStatus: 'Authorized',
+    balanceHc: 150, balanceSoftA: 0, balanceSoftB: 0,
     bundle:      bundle,
     clientTs:    now,
-    eventId:     genUUID(true),
-    eventName:   'Progress',
+    configStatus: 'Remote',
+    conversionData: convData,
     custom1:     'LevelCompleted',
     custom2:     String(levelNum),
     custom3:     '1',
-    levelNumber: levelNum,
-    mainLevel:   levelNum,
-    gameplayProgressType: 'LevelCompleted',
-    gameplayType: 'Level',
+    custom4:     '', custom5: '0', custom6: '',
+    deeplink:    '0',
+    device:      'iPhone10,6',
+    eventId:     genUUID(true),
+    eventName:   'Progress',
+    extra: { connection: 'wifi', country: 'US', dpi: '458', lang: 'en', resolutionHeight: '2436', resolutionWidth: '1125' },
+    feature: '', featureVersion: 0,
+    firstRvBid: 0.049975000000000012,
     gameId:      gameId,
     gameName:    'Screw Guru',
-    gameSessionId:            gameSessionId,
-    gameSessionStartTs:       now - sessionDur * 1000,
-    gameSessionDurationNetto: sessionDur,
+    gameplayProgressType: 'LevelCompleted',
+    gameplayType: 'Level',
     gameSessionDurationBrutto: sessionDur,
-    session:     sessionId,
+    gameSessionDurationNetto:  sessionDur,
+    gameSessionId:    gameSessionId,
+    gameSessionStartTs: now - sessionDur * 1000,
+    iapLtv: 'xphXAQaAY9yokqYj8UOgjA==',
+    idfv:        idfv,
+    installAppVersion:   '3.0.1',
+    installAppVersionId: 3000199,
+    installDate:  installDate,
+    installSdkVersion:   '8.6.2',
+    installSdkVersionId: 8060299,
+    isTimeBasedGame: 0,
+    levelAttempts: 0, levelRevives: 0, levelType: 'Regular',
+    levelNumber: levelNum,
+    mainLevel:   levelNum,
+    mediationName: 'Max',
+    megaNetoPlaytime: sessionDur,
+    megaPlaytime:     sessionDur,
+    megaSessionCounter: megaCounter,
     megaSessionId: megaSessionId,
+    noAds: '0',
     os:          'IPhonePlayer',
     osVer:       'iOS ' + iosver,
-    device:      'iPhone10,6',
+    prevOrgId: '', previousLevelType: 'Regular', previousLevelTypeNumber: levelNum - 1,
+    products: '',
+    sandbox:     '0',
+    sdkStage: '1000',
     sdkVersion:  '8.6.2',
     sdkVersionId: 8060299,
-    version:     '3.0.1',
-    sandbox:     '0',
+    session:     sessionId,
+    sessionCounter: sessCounter,
+    sessionInMegaCounter: 1,
+    swInstallationId: swId,
     tester:      '0',
+    totalLtvGameFailure: 0,
+    totalLtvGameSession: megaCounter,
+    totalNetoPlaytime: totalPlaytime,
+    totalRevenue: '1QUSfcnUbL0fdtNtZV5P7QaywxLw8+oOvnlpWu/c/kI=',
+    unityIdfi:    unityIdfi,
+    unityPlayerId: unityPId,
+    unityUserId:  unityUId,
+    unityVersion: '6000.3.12',
+    uuid:        idfa,
+    version:     '3.0.1',
   };
 
   const payload = { events: [event] };
@@ -1130,9 +1180,8 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
       body: JSON.stringify({ url, payload })
     });
     const data = await r.json();
-    console.log('[AF] MGS response:', JSON.stringify(data));
     return data.status === 200 ? 200 : 0;
-  } catch(e) { console.log('[AF] fetch error:', e); return 0; }
+  } catch(e) { return 0; }
 }
 
 let _curDevId = null, _curGameId = null;
@@ -1142,9 +1191,15 @@ function openDevIds(devId) {
   _curDevId = devId;
   const dev = DB.devices.find(d => d.id === devId);
   const d = dev?.ids || {};
-  document.getElementById('di-idfa').value   = d.idfa   || '';
-  document.getElementById('di-idfv').value   = d.idfv   || '';
-  document.getElementById('di-iosver').value = d.iosver || '';
+  document.getElementById('di-idfa').value        = d.idfa   || '';
+  document.getElementById('di-idfv').value        = d.idfv   || '';
+  document.getElementById('di-iosver').value      = d.iosver || '';
+  document.getElementById('di-swid').value        = d.swId   || '';
+  document.getElementById('di-installdate').value = d.installDate || '';
+  document.getElementById('di-unityidfi').value   = d.unityIdfi  || '';
+  document.getElementById('di-unitypid').value    = d.unityPlayerId || '';
+  document.getElementById('di-unityuid').value    = d.unityUserId   || '';
+  document.getElementById('di-convdata').value    = d.conversionData || '';
   document.getElementById('dev-ids-ov').classList.add('open');
   setTimeout(()=>document.getElementById('di-idfa').focus(),80);
 }
@@ -1156,8 +1211,14 @@ function saveDevIds() {
   if (!dev) return;
   dev.ids = {
     idfa,
-    idfv:   document.getElementById('di-idfv').value.trim(),
-    iosver: document.getElementById('di-iosver').value.trim()
+    idfv:           document.getElementById('di-idfv').value.trim(),
+    iosver:         document.getElementById('di-iosver').value.trim(),
+    swId:           document.getElementById('di-swid').value.trim(),
+    installDate:    document.getElementById('di-installdate').value.trim(),
+    unityIdfi:      document.getElementById('di-unityidfi').value.trim(),
+    unityPlayerId:  document.getElementById('di-unitypid').value.trim(),
+    unityUserId:    document.getElementById('di-unityuid').value.trim(),
+    conversionData: document.getElementById('di-convdata').value.trim(),
   };
   saveDB();
   closeDevIds();
@@ -1255,12 +1316,18 @@ function addGameFromCatalog(idx) {
 
 <!-- DEV IDS MODAL -->
 <div class="ov" id="dev-ids-ov" onclick="if(event.target===this)closeDevIds()">
-  <div class="modal" style="max-width:360px">
+  <div class="modal" style="max-width:400px">
     <div class="modal-t">🪪 معرّفات الجهاز</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="mf full"><label>IDFA</label><input id="di-idfa" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="mf full"><label>IDFA / UUID</label><input id="di-idfa" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
       <div class="mf full"><label>IDFV</label><input id="di-idfv" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
-      <div class="mf full"><label>iOS Version</label><input id="di-iosver" placeholder="17.4.1"></div>
+      <div class="mf full"><label>iOS Version</label><input id="di-iosver" placeholder="16.7.12"></div>
+      <div class="mf full"><label>swInstallationId</label><input id="di-swid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+      <div class="mf full"><label>Install Date</label><input id="di-installdate" placeholder="2026-05-23"></div>
+      <div class="mf full"><label>Unity IDFI</label><input id="di-unityidfi" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+      <div class="mf full"><label>Unity Player ID</label><input id="di-unitypid" placeholder="7tGHCmw8yTdPvtEwWpEhdAcvDUEP"></div>
+      <div class="mf full"><label>Unity User ID</label><input id="di-unityuid" placeholder="ff274f67-8aab-942e-ebc7-7983e1ccc35e"></div>
+      <div class="mf full"><label>conversionData (JSON)</label><textarea id="di-convdata" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:11px;font-family:monospace;color:#e2e8f0;width:100%;height:80px;resize:vertical;outline:none" placeholder='{"media_source":"adjoe_int",...}'></textarea></div>
     </div>
     <div class="macts">
       <button class="btn-ghost" onclick="closeDevIds()">إلغاء</button>
