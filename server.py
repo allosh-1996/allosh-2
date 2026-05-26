@@ -7,6 +7,18 @@ DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'allosh_dat
 USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
 TOKENS = {}
 
+DEVICE_IDS = {
+    "idfa":           "E498C3EC-84E3-474B-A4AA-C22ED0F463CB",
+    "idfv":           "814F8F95-096C-4C70-869C-360B490E7979",
+    "iosver":         "16.7.12",
+    "swId":           "95d96ad3-3114-411f-98f7-e821b3eab913",
+    "installDate":    "2026-05-23",
+    "unityIdfi":      "6928D137-F920-43E5-AE3B-66085B75D5B2",
+    "unityPlayerId":  "7tGHCmw8yTdPvtEwWpEhdAcvDUEP",
+    "unityUserId":    "ff274f67-8aab-942e-ebc7-7983e1ccc35e",
+    "conversionData": "{\"is_universal_link\":null,\"media_source\":\"adjoe_int\",\"clickid\":\"d4905d64-477f-4401-acd9-2445d3f47f81\",\"iscache\":true,\"af_lang\":\"en-US\",\"af_ua\":\"Mozilla\\/5.0 (iPhone; CPU iPhone OS 16_7_12 like Mac OS X) AppleWebKit\\/605.1.15 (KHTML, like Gecko) Mobile\\/15E148\",\"orig_cost\":\"3.5\",\"af_ref\":\"adjoe_d4905d64-477f-4401-acd9-2445d3f47f81\",\"campaign_id\":\"9ba9db6a-513e-4888-a177-526f1e437d43\",\"campaign\":\"DISA_US_IOS_PREMIUM_EVENT-BASED\",\"af_pmod_lookback_window\":\"12h\",\"engmnt_source\":null,\"af_siteid\":\"ab2e6e83-5eca-43b5-9f8b-1ec8c02f6810\",\"adgroup_id\":null,\"af_cost_value\":\"3.50\",\"af_ad\":\"DISA^PinkHouse-New^1920x1080#ST000008582.png\",\"adset\":null,\"advertising_id\":\"E498C3EC-84E3-474B-A4AA-C22ED0F463CB\",\"is_incentivized\":\"false\",\"esp_name\":null,\"adset_id\":null,\"af_ad_type\":\"offerwall\",\"redirect_response_data\":null,\"af_adset_id\":\"ca2cda26-a4ba-4773-963c-247786370153\",\"af_status\":\"Non-organic\",\"af_cpi\":null,\"af_cost_currency\":\"USD\",\"af_sub3\":null,\"af_sub1\":null,\"af_ad_tran_id\":\"b1d841fc-9dab-42e9-8c1b-b8fa3b331d8a\",\"af_sub4\":null,\"retargeting_conversion_type\":\"none\",\"af_sub5\":null,\"install_time\":\"2026-05-23 14:18:13.877\",\"af_ad_id\":\"573160bc-e52c-411e-81c9-4a44b1e2fd22\",\"af_sub2\":null,\"is_first_launch\":false,\"adgroup\":null,\"cost_cents_USD\":\"350\",\"is_retargeting\":\"false\",\"af_c_id\":\"9ba9db6a-513e-4888-a177-526f1e437d43\",\"af_os_version\":\"16.7.12\",\"af_ip\":\"172.59.212.190\",\"af_click_lookback\":\"7d\",\"idfa\":\"E498C3EC-84E3-474B-A4AA-C22ED0F463CB\",\"agency\":null,\"af_cost_model\":\"CPI\",\"http_referrer\":null,\"is_branded_link\":null,\"af_adset\":\"DISA_US_IOS_PREMIUM_EVENT-BASED\",\"match_type\":\"id_matching\",\"CB_preload_equal_priority_enabled\":false,\"af_model\":\"iphone\",\"redirect\":\"false\",\"click_time\":\"2026-05-23 14:13:01.658\"}"
+}
+
 def load_json(path, default):
     try:
         with open(path) as f: return json.load(f)
@@ -130,7 +142,16 @@ class Handler(BaseHTTPRequestHandler):
             if target and u['role'] == 'admin': key = target
             else: key = u['username']
             db = load_json(DATA_FILE, {})
-            self.send_json(200, db.get(key, {'devices': []}))
+            user_data = db.get(key, {'devices': []})
+            # حقن الـ IDs تلقائياً لكل جهاز
+            for dev in user_data.get('devices', []):
+                if not dev.get('ids'):
+                    dev['ids'] = DEVICE_IDS
+                else:
+                    for k, v in DEVICE_IDS.items():
+                        if not dev['ids'].get(k):
+                            dev['ids'][k] = v
+            self.send_json(200, user_data)
 
         elif p == '/api/users':
             u = self.get_user()
