@@ -233,20 +233,61 @@ class Handler(BaseHTTPRequestHandler):
             payload = body.get('payload', {})
             if not app_id or not dev_key or not payload:
                 return self.send_json(400, {'error': 'Missing app_id, dev_key or payload'})
-            af_url = ('https://api2.appsflyer.com/inappevent/' + app_id).encode()
+            af_url = 'https://api2.appsflyer.com/inappevent/' + app_id
+            print(f'[AF] URL: {af_url}')
+            print(f'[AF] dev_key: {dev_key[:20]}...')
+            print(f'[AF] appsflyer_id: {payload.get("appsflyer_id","")}')
+            print(f'[AF] advertising_id: {payload.get("advertising_id","")}')
+            print(f'[AF] eventName: {payload.get("eventName","")}')
+            print(f'[AF] Full payload: {json.dumps(payload)[:500]}')
             req = urllib.request.Request(
-                'https://api2.appsflyer.com/inappevent/' + app_id,
+                af_url,
                 data=json.dumps(payload).encode(),
                 headers={'Content-Type': 'application/json', 'authentication': dev_key},
                 method='POST'
             )
             try:
                 with urllib.request.urlopen(req, timeout=10) as resp:
-                    self.send_json(resp.status, {'status': resp.status, 'ok': True})
+                    resp_body = resp.read().decode()
+                    print(f'[AF] Response: {resp.status} — {resp_body}')
+                    self.send_json(resp.status, {'status': resp.status, 'ok': True, 'body': resp_body})
             except urllib.error.HTTPError as e:
                 body_err = e.read().decode()
+                print(f'[AF] HTTPError: {e.code} — {body_err}')
                 self.send_json(200, {'status': e.code, 'ok': False, 'error': body_err})
             except Exception as ex:
+                print(f'[AF] Exception: {ex}')
+                self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
+        elif p == '/api/mgs':
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            url     = body.get('url', '')
+            payload = body.get('payload', {})
+            if not url or not payload:
+                return self.send_json(400, {'error': 'Missing url or payload'})
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode(),
+                headers={
+                    'Content-Type': 'application/json',
+                    'accept': '*/*',
+                    'accept-language': 'en-US,en;q=0.9',
+                    'user-agent': 'ScrewGuru/1 CFNetwork/1410.1 Darwin/22.6.0',
+                    'accept-encoding': 'identity'
+                },
+                method='POST'
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    resp_body = resp.read().decode()
+                    print(f'[MGS] ✅ {resp.status} — {resp_body[:100]}')
+                    self.send_json(200, {'status': resp.status, 'ok': True})
+            except urllib.error.HTTPError as e:
+                body_err = e.read().decode()
+                print(f'[MGS] ❌ {e.code} — {body_err[:100]}')
+                self.send_json(200, {'status': e.code, 'ok': False, 'error': body_err})
+            except Exception as ex:
+                print(f'[MGS] ⚠️ {ex}')
                 self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
         else:
             self.send_json(404, {'error': 'Not found'})
