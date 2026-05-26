@@ -282,6 +282,112 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as ex:
                 print(f'[AF] Exception: {ex}')
                 self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
+        elif p == '/api/run_af':
+            import uuid as _uuid, time as _time, random as _random, math as _math
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            level_num   = body.get('levelNum', 5)
+            af_id       = body.get('afId', '')
+            dev_key     = body.get('devKey', '')
+            idfa        = body.get('idfa', '')
+            idfv        = body.get('idfv', '')
+            ios_ver     = body.get('iosver', '16.7.12')
+            sw_id       = body.get('swId', '')
+            install_date= body.get('installDate', '')
+            unity_idfi  = body.get('unityIdfi', '')
+            unity_pid   = body.get('unityPlayerId', '')
+            unity_uid   = body.get('unityUserId', '')
+            conv_data   = body.get('conversionData', '')
+            bundle      = body.get('bundle', 'com.disassembly.ios.master')
+            game_id     = 'e203c8df-df50-4a5d-a6ba-2cc8ac5c3a30'
+            now         = int(_time.time() * 1000)
+            session_dur = _random.randint(20, 40)
+            mega_ctr    = _random.randint(8, 14)
+            sess_ctr    = mega_ctr + 1
+            total_pt    = _random.randint(800, 1200)
+            def gen_uuid(upper=False):
+                u2 = str(_uuid.uuid4())
+                return u2.upper() if upper else u2
+            game_session_id = gen_uuid(False)
+            session_id      = gen_uuid(True)
+            mega_session_id = gen_uuid(True)
+            base = {
+                'abId': '', 'abName': '', 'abVariant': '',
+                'activeDay': 2, 'adsFreeZoneEnabled': 0,
+                'adsLtv': 'aoCCpb3hjpriAE76peh64U84ULaKLmKitx7uKY5/V4A=',
+                'apiKey': dev_key, 'appsFlyerId': af_id,
+                'attStatus': 'Authorized', 'averageFps': 29,
+                'balanceHc': 150, 'balanceSoftA': 0, 'balanceSoftB': 0,
+                'bundle': bundle, 'configStatus': 'Remote',
+                'conversionData': conv_data,
+                'criticalFpsDuration': 0, 'criticalMinFps': -1,
+                'custom2': str(level_num), 'custom4': '', 'custom5': '0', 'custom6': '',
+                'deeplink': '0', 'device': 'iPhone10,6', 'eventName': 'Progress',
+                'extra': {'connection': 'wifi', 'country': 'US', 'dpi': '458', 'lang': 'en', 'resolutionHeight': '2436', 'resolutionWidth': '1125'},
+                'feature': '', 'featureVersion': 0,
+                'firstRvBid': 0.04997500000000001, 'fpsMeasurementDuration': 6.86995125,
+                'gameId': game_id, 'gameName': 'Screw Guru', 'gameplayType': 'Level',
+                'gameSessionDurationBrutto': session_dur, 'gameSessionDurationNetto': session_dur,
+                'gameSessionId': game_session_id, 'gameSessionStartTs': now - session_dur * 1000,
+                'iapLtv': 'xphXAQaAY9yokqYj8UOgjA==',
+                'idfv': idfv,
+                'installAppVersion': '3.0.1', 'installAppVersionId': 3000199,
+                'installDate': install_date, 'installSdkVersion': '8.6.2', 'installSdkVersionId': 8060299,
+                'isTimeBasedGame': 0, 'levelRevives': 0, 'levelType': 'Regular',
+                'levelNumber': level_num, 'mainLevel': level_num,
+                'medianFps': 29, 'mediationName': 'Max',
+                'megaNetoPlaytime': session_dur, 'megaPlaytime': session_dur,
+                'megaSessionCounter': mega_ctr, 'megaSessionId': mega_session_id,
+                'noAds': '0', 'os': 'IPhonePlayer', 'osVer': 'iOS ' + ios_ver,
+                'prevOrgId': '', 'previousLevelType': 'Regular', 'previousLevelTypeNumber': level_num - 1,
+                'products': '', 'samplesCount': 7, 'sandbox': '0', 'sdkStage': '1000',
+                'sdkVersion': '8.6.2', 'sdkVersionId': 8060299,
+                'session': session_id, 'sessionCounter': sess_ctr, 'sessionInMegaCounter': 1,
+                'swInstallationId': sw_id, 'tester': '0',
+                'totalLtvGameFailure': 0, 'totalLtvGameSession': mega_ctr,
+                'totalNetoPlaytime': total_pt,
+                'totalRevenue': '1QUSfcnUbL0fdtNtZV5P7QaywxLw8+oOvnlpWu/c/kI=',
+                'unityIdfi': unity_idfi, 'unityPlayerId': unity_pid,
+                'unityUserId': unity_uid, 'unityVersion': '6000.3.12',
+                'uuid': idfa, 'version': '3.0.1',
+            }
+            complete_dur = _random.randint(30, 50)
+            start_event = {**base, 'clientTs': now, 'eventId': gen_uuid(True),
+                'custom1': 'LevelStarted', 'custom3': '0',
+                'gameplayProgressType': 'LevelStarted', 'levelAttempts': 0, 'attempt': 1}
+            complete_event = {**base,
+                'clientTs': now + complete_dur * 1000, 'eventId': gen_uuid(True),
+                'custom1': 'LevelCompleted', 'custom3': '1',
+                'gameplayProgressType': 'LevelCompleted', 'levelAttempts': 1, 'attempt': 2,
+                'gameSessionDurationBrutto': session_dur + complete_dur,
+                'gameSessionDurationNetto': session_dur + complete_dur,
+                'megaNetoPlaytime': session_dur + complete_dur,
+                'megaPlaytime': session_dur + complete_dur}
+            url = f'https://3-0-1-{game_id}.analytics.mobilegamestats.com/events'
+            results = []
+            for ev in [start_event, complete_event]:
+                req = urllib.request.Request(url,
+                    data=json.dumps({'events': [ev]}).encode(),
+                    headers={'Content-Type': 'application/json', 'accept': '*/*',
+                        'user-agent': 'ScrewGuru/1 CFNetwork/1410.1 Darwin/22.6.0',
+                        'accept-encoding': 'identity', 'accept-language': 'en-US,en;q=0.9'},
+                    method='POST')
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        rb = resp.read().decode()
+                        print(f'[RUN_AF] {ev["custom1"]}: {resp.status}')
+                        results.append(resp.status)
+                except urllib.error.HTTPError as e:
+                    rb = e.read().decode()
+                    print(f'[RUN_AF] {ev["custom1"]}: {e.code} — {rb}')
+                    results.append(e.code)
+                except Exception as ex:
+                    print(f'[RUN_AF] Exception: {ex}')
+                    results.append(0)
+                import time as _t2; _t2.sleep(1)
+            ok = all(r == 200 for r in results)
+            self.send_json(200, {'ok': ok, 'results': results})
+
         elif p == '/api/mgs':
             u = self.get_user()
             if not u: return self.send_json(401, {'error': 'Unauthorized'})

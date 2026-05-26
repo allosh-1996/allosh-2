@@ -935,7 +935,28 @@ async function runTask(taskId, taskName) {
     }
     const ids = { idfv: devIds.idfv || idfa, iosver: devIds.iosver || '16.7.12' };
     console.log('[AF] Sending:', {levelNum, idfa: idfa.slice(0,8)+'...', afId, bundle, hasDevKey: !!devKey});
-    status = await sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids);
+    console.log('[AF] Sending via /api/run_af, convData len:', (ids.conversionData||'').length);
+    try {
+      const r = await fetch('/api/run_af', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+        body: JSON.stringify({
+          levelNum, afId, devKey,
+          idfa, idfv: ids.idfv || idfa,
+          iosver: ids.iosver || '16.7.12',
+          swId: ids.swId || '',
+          installDate: ids.installDate || '',
+          unityIdfi: ids.unityIdfi || '',
+          unityPlayerId: ids.unityPlayerId || '',
+          unityUserId: ids.unityUserId || '',
+          conversionData: ids.conversionData || '',
+          bundle
+        })
+      });
+      const data = await r.json();
+      console.log('[AF] run_af response:', data);
+      status = data.ok ? 200 : 0;
+    } catch(e) { console.log('[AF] error:', e); status = 0; }
   } else {
     // Mixpanel flow
     const mpUid = game.uid || '';
