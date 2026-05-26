@@ -479,7 +479,7 @@ function renderTree() {
       </div>`;
     }
     const dActive = selDev === dev.id ? 'sel' : '';
-    const hasAdid = !!(localStorage.getItem('_ids_'+dev.id));
+    const hasAdid = !!(dev.ids?.idfa);
     return `<div>
       <div class="dev-row ${dActive}" data-action="toggle-dev" data-dev="${dev.id}">
         <span class="dev-lbl"><span class="arr ${dOpen?'open':''}">▶</span> 📱 ${esc(dev.name)}</span>
@@ -911,8 +911,8 @@ async function runTask(taskId, taskName) {
   const game = getGame();
   if (!game) return;
 
-  // Get distinct_id (Mixpanel) for this game
-  const uid = localStorage.getItem('_uid_' + selGame);
+  // Get distinct_id from DB
+  const uid = game.uid || '';
   if (!uid) {
     alert('⚠️ ما في Mixpanel ID محفوظ لهاللعبة!\nاضغط 🪪 جنب اللعبة وحط الـ distinct_id أول.');
     return;
@@ -939,8 +939,9 @@ async function runTask(taskId, taskName) {
 }
 
 async function sendMPEvent(eventName, level, distinctId, deviceId) {
-  // Get device IDs stored under the current device
-  const ids = JSON.parse(localStorage.getItem('_ids_' + selDev) || '{}');
+  // Get device IDs from DB
+  const dev = DB.devices.find(d => d.id === selDev);
+  const ids = dev?.ids || {};
   const idfa    = deviceId || ids.idfa   || '';
   const idfv    = ids.idfv   || '';
   const iosver  = ids.iosver || '18.7.6';
@@ -1052,7 +1053,8 @@ let _curDevId = null, _curGameId = null;
 // Device IDs modal
 function openDevIds(devId) {
   _curDevId = devId;
-  const d = JSON.parse(localStorage.getItem('_ids_'+devId)||'{}');
+  const dev = DB.devices.find(d => d.id === devId);
+  const d = dev?.ids || {};
   document.getElementById('di-idfa').value   = d.idfa   || '';
   document.getElementById('di-idfv').value   = d.idfv   || '';
   document.getElementById('di-iosver').value = d.iosver || '';
@@ -1063,11 +1065,14 @@ function closeDevIds() { document.getElementById('dev-ids-ov').classList.remove(
 function saveDevIds() {
   const idfa = document.getElementById('di-idfa').value.trim();
   if (!idfa) { alert('IDFA مطلوب'); return; }
-  localStorage.setItem('_ids_'+_curDevId, JSON.stringify({
+  const dev = DB.devices.find(d => d.id === _curDevId);
+  if (!dev) return;
+  dev.ids = {
     idfa,
     idfv:   document.getElementById('di-idfv').value.trim(),
     iosver: document.getElementById('di-iosver').value.trim()
-  }));
+  };
+  saveDB();
   closeDevIds();
   render();
 }
@@ -1075,7 +1080,8 @@ function saveDevIds() {
 // Game UID modal
 function openGameUid(devId, siteId, gameId) {
   _curGameId = gameId;
-  document.getElementById('gu-uid').value = localStorage.getItem('_uid_'+gameId)||'';
+  const game = DB.devices.find(d=>d.id===devId)?.sites?.find(s=>s.id===siteId)?.games?.find(g=>g.id===gameId);
+  document.getElementById('gu-uid').value = game?.uid || '';
   document.getElementById('game-uid-ov').classList.add('open');
   setTimeout(()=>document.getElementById('gu-uid').focus(),80);
 }
@@ -1083,7 +1089,11 @@ function closeGameUid() { document.getElementById('game-uid-ov').classList.remov
 function saveGameUid() {
   const uid = document.getElementById('gu-uid').value.trim();
   if (!uid) { alert('UID مطلوب'); return; }
-  localStorage.setItem('_uid_'+_curGameId, uid);
+  // Save to DB under the game
+  DB.devices.forEach(dev => dev.sites?.forEach(site => site.games?.forEach(game => {
+    if (game.id === _curGameId) game.uid = uid;
+  })));
+  saveDB();
   closeGameUid();
 }
 
