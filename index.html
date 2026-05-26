@@ -340,16 +340,6 @@ const SC = {
 // ══════════════════════════════════════
 const GAME_CATALOG = [
   {
-    name: 'Disney Solitaire',
-    type: 'mp',
-    tasks: ['1','2','3','4','6','8','10','12','15','20']
-  },
-  {
-    name: 'Coin Master',
-    type: 'mp',
-    tasks: ['3','10','20','40','80','120','160','200','230','260']
-  },
-  {
     name: 'Screw Guru',
     type: 'af',
     bundle: 'com.disassembly.ios.master',
@@ -944,6 +934,7 @@ async function runTask(taskId, taskName) {
       return;
     }
     const ids = { idfv: devIds.idfv || idfa, iosver: devIds.iosver || '16.7.12' };
+    console.log('[AF] Sending:', {levelNum, idfa: idfa.slice(0,8)+'...', afId, bundle, hasDevKey: !!devKey});
     status = await sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids);
   } else {
     // Mixpanel flow
@@ -1139,8 +1130,9 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
       body: JSON.stringify({ url, payload })
     });
     const data = await r.json();
+    console.log('[AF] MGS response:', JSON.stringify(data));
     return data.status === 200 ? 200 : 0;
-  } catch(e) { return 0; }
+  } catch(e) { console.log('[AF] fetch error:', e); return 0; }
 }
 
 let _curDevId = null, _curGameId = null;

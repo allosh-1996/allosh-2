@@ -1,4 +1,5 @@
 import json, os, time, hashlib, secrets, urllib.request, urllib.error
+LAST_MGS = {}
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -142,6 +143,8 @@ class Handler(BaseHTTPRequestHandler):
                 tasks = sum(len(g.get('tasks',[])) for d in udb.get('devices',[]) for s in d.get('sites',[]) for g in s.get('games',[]))
                 result.append({'username': usr['username'], 'role': usr['role'], 'devices': len(udb.get('devices',[])), 'tasks': tasks})
             self.send_json(200, result)
+        elif p == '/api/debug':
+            self.send_json(200, {'last_mgs': LAST_MGS})
         else:
             self.send_json(404, {'error': 'Not found'})
 
@@ -265,6 +268,13 @@ class Handler(BaseHTTPRequestHandler):
             payload = body.get('payload', {})
             if not url or not payload:
                 return self.send_json(400, {'error': 'Missing url or payload'})
+            print(f'[MGS] URL: {url}')
+            if payload.get('events'):
+                ev = payload['events'][0]
+                print(f'[MGS] appsFlyerId: {ev.get("appsFlyerId","")}')
+                print(f'[MGS] uuid/idfa: {ev.get("uuid","")}')
+                print(f'[MGS] apiKey: {str(ev.get("apiKey",""))[:20]}...')
+                print(f'[MGS] levelNumber: {ev.get("levelNumber","")}')
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode(),
@@ -280,14 +290,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     resp_body = resp.read().decode()
-                    print(f'[MGS] ✅ {resp.status} — {resp_body[:100]}')
-                    self.send_json(200, {'status': resp.status, 'ok': True})
+                    print(f'[MGS] ✅ {resp.status} — body: [{resp_body}]')
+                    LAST_MGS.update({'status': resp.status, 'ok': True, 'body': resp_body, 'url': url, 'afId': payload.get('events',[{}])[0].get('appsFlyerId','')})
+                    self.send_json(200, {'status': resp.status, 'ok': True, 'body': resp_body})
             except urllib.error.HTTPError as e:
                 body_err = e.read().decode()
-                print(f'[MGS] ❌ {e.code} — {body_err[:100]}')
+                print(f'[MGS] ❌ {e.code} — {body_err}')
                 self.send_json(200, {'status': e.code, 'ok': False, 'error': body_err})
             except Exception as ex:
                 print(f'[MGS] ⚠️ {ex}')
+                LAST_MGS.update({'status': 0, 'ok': False, 'error': str(ex), 'url': url})
                 self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
         else:
             self.send_json(404, {'error': 'Not found'})
