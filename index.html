@@ -1095,7 +1095,7 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
   const sessCounter   = megaCounter + 1;
   const totalPlaytime = Math.floor(Math.random() * 300) + 800;
 
-  const event = {
+  const base = {
     abId: '', abName: '', abVariant: '',
     activeDay: 2,
     adsFreeZoneEnabled: 0,
@@ -1104,25 +1104,22 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
     appsFlyerId: afId,
     attempt: 1,
     attStatus: 'Authorized',
+    averageFps: 29,
     balanceHc: 150, balanceSoftA: 0, balanceSoftB: 0,
     bundle:      bundle,
-    clientTs:    now,
     configStatus: 'Remote',
     conversionData: convData,
-    custom1:     'LevelCompleted',
     custom2:     String(levelNum),
-    custom3:     '1',
     custom4:     '', custom5: '0', custom6: '',
     deeplink:    '0',
     device:      'iPhone10,6',
-    eventId:     genUUID(true),
     eventName:   'Progress',
     extra: { connection: 'wifi', country: 'US', dpi: '458', lang: 'en', resolutionHeight: '2436', resolutionWidth: '1125' },
     feature: '', featureVersion: 0,
     firstRvBid: 0.049975000000000012,
+    fpsMeasurementDuration: 6.86995125,
     gameId:      gameId,
     gameName:    'Screw Guru',
-    gameplayProgressType: 'LevelCompleted',
     gameplayType: 'Level',
     gameSessionDurationBrutto: sessionDur,
     gameSessionDurationNetto:  sessionDur,
@@ -1136,9 +1133,10 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
     installSdkVersion:   '8.6.2',
     installSdkVersionId: 8060299,
     isTimeBasedGame: 0,
-    levelAttempts: 0, levelRevives: 0, levelType: 'Regular',
+    levelRevives: 0, levelType: 'Regular',
     levelNumber: levelNum,
     mainLevel:   levelNum,
+    medianFps: 29,
     mediationName: 'Max',
     megaNetoPlaytime: sessionDur,
     megaPlaytime:     sessionDur,
@@ -1149,6 +1147,7 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
     osVer:       'iOS ' + iosver,
     prevOrgId: '', previousLevelType: 'Regular', previousLevelTypeNumber: levelNum - 1,
     products: '',
+    samplesCount: 7,
     sandbox:     '0',
     sdkStage: '1000',
     sdkVersion:  '8.6.2',
@@ -1170,16 +1169,54 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
     version:     '3.0.1',
   };
 
-  const payload = { events: [event] };
+  // Event 1: LevelStarted
+  const startEvent = {
+    ...base,
+    clientTs:    now,
+    eventId:     genUUID(true),
+    custom1:     'LevelStarted',
+    custom3:     '0',
+    gameplayProgressType: 'LevelStarted',
+    levelAttempts: 0,
+    attempt: 1,
+  };
+
+  // Event 2: LevelCompleted (30-45 ثانية بعد)
+  const completeDur = Math.floor(Math.random() * 15) + 30;
+  const completeEvent = {
+    ...base,
+    clientTs:    now + completeDur * 1000,
+    eventId:     genUUID(true),
+    custom1:     'LevelCompleted',
+    custom3:     '1',
+    gameplayProgressType: 'LevelCompleted',
+    levelAttempts: 1,
+    attempt: 2,
+    gameSessionDurationBrutto: sessionDur + completeDur,
+    gameSessionDurationNetto:  sessionDur + completeDur,
+    megaNetoPlaytime: sessionDur + completeDur,
+    megaPlaytime:     sessionDur + completeDur,
+  };
+
   const url = 'https://3-0-1-' + gameId + '.analytics.mobilegamestats.com/events';
 
   try {
-    const r = await fetch('/api/mgs', {
+    // بعت LevelStarted أولاً
+    await fetch('/api/mgs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
-      body: JSON.stringify({ url, payload })
+      body: JSON.stringify({ url, payload: { events: [startEvent] } })
     });
-    const data = await r.json();
+
+    // انتظر ثانيتين ثم بعت LevelCompleted
+    await new Promise(r => setTimeout(r, 2000));
+
+    const r2 = await fetch('/api/mgs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify({ url, payload: { events: [completeEvent] } })
+    });
+    const data = await r2.json();
     return data.status === 200 ? 200 : 0;
   } catch(e) { return 0; }
 }
