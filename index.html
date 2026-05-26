@@ -943,16 +943,7 @@ async function runTask(taskId, taskName) {
       alert('⚠️ ناقص معلومات!\nاضغط 🪪 جنب اللعبة وحط:\n- AppsFlyer ID\n- Dev Key\nو 🪪 جنب الجهاز وحط IDFA');
       return;
     }
-    // Merge device IDs + game IDs
-    const ids = {
-      idfv:             devIds.idfv    || idfa,
-      iosver:           devIds.iosver  || '16.7.12',
-      conversionData:   game.conversionData  || '',
-      swInstallationId: game.swInstallationId || '',
-      unityIdfi:        game.unityIdfi        || '',
-      unityPlayerId:    game.unityPlayerId    || '',
-      unityUserId:      game.unityUserId      || ''
-    };
+    const ids = { idfv: devIds.idfv || idfa, iosver: devIds.iosver || '16.7.12' };
     status = await sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids);
   } else {
     // Mixpanel flow
@@ -1086,14 +1077,9 @@ async function sendMPEvent(eventName, level, distinctId, deviceId) {
 const MP_TOKEN = '584b45f0bcfdb3605143a47f5f7ac520';
 
 async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
-  const idfv      = ids.idfv   || idfa;
-  const iosver    = ids.iosver || '16.7.12';
-  const convData  = ids.conversionData || '';
-  const swInstall = ids.swInstallationId || '';
-  const unityIdfi = ids.unityIdfi || '';
-  const unityPlayer = ids.unityPlayerId || '';
-  const unityUser = ids.unityUserId || '';
-  const gameId    = 'e203c8df-df50-4a5d-a6ba-2cc8ac5c3a30';
+  const idfv   = ids.idfv   || idfa;
+  const iosver = ids.iosver || '16.7.12';
+  const gameId = 'e203c8df-df50-4a5d-a6ba-2cc8ac5c3a30';
   const now       = Date.now();
 
   function genUUID(upper) {
@@ -1110,60 +1096,37 @@ async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
   const megaSessionId = genUUID(true);
 
   const event = {
-    abId: '', abName: '', abVariant: '',
-    activeDay: 2, adsFreeZoneEnabled: 0,
-    adsLtv: 'aoCCpb3hjpriAE76peh64U84ULaKLmKitx7uKY5/V4A=',
-    apiKey: devKey,
+    apiKey:      devKey,
     appsFlyerId: afId,
-    attempt: 1, attStatus: 'Authorized',
-    averageFps: 29,
-    balanceHc: 375, balanceSoftA: 0, balanceSoftB: 0,
-    bundle: bundle,
-    clientTs: now,
-    configStatus: 'Remote',
-    conversionData: convData,
-    criticalFpsDuration: 0, criticalMinFps: -1,
-    custom1: 'LevelCompleted',
-    custom2: String(levelNum),
-    custom3: '1',
-    custom4: '', custom5: '0', custom6: '',
-    deeplink: '0', device: 'iPhone10,6',
-    eventId: genUUID(true),
-    eventName: 'Progress',
-    extra: { connection: 'wifi', country: 'US', dpi: '458', lang: 'en', resolutionHeight: '2436', resolutionWidth: '1125' },
-    feature: '', featureVersion: 0,
-    firstRvBid: 0.04997500000000001,
-    fpsMeasurementDuration: 7.6,
-    gameId: gameId, gameName: 'Screw Guru',
-    gameplayProgressType: 'LevelCompleted', gameplayType: 'Level',
-    gameSessionDurationBrutto: sessionDur, gameSessionDurationNetto: sessionDur,
-    gameSessionId: gameSessionId,
-    gameSessionStartTs: now - sessionDur * 1000,
-    iapLtv: 'xphXAQaAY9yokqYj8UOgjA==',
-    idfv: idfv,
-    installAppVersion: '3.0.1', installAppVersionId: 3000199,
-    installDate: '2026-05-23',
-    installSdkVersion: '8.6.2', installSdkVersionId: 8060299,
-    isTimeBasedGame: 0,
-    levelAttempts: 1, levelNumber: levelNum, levelRevives: 0,
-    levelType: 'Regular', mainLevel: levelNum,
-    medianFps: 29, mediationName: 'Max',
-    megaNetoPlaytime: sessionDur, megaPlaytime: sessionDur,
-    megaSessionCounter: 1, megaSessionId: megaSessionId,
-    noAds: '0', os: 'IPhonePlayer', osVer: 'iOS ' + iosver,
-    previousLevelType: 'Regular', previousLevelTypeNumber: levelNum - 1 || 1,
-    prevOrgId: '', products: '',
-    samplesCount: 8, sandbox: '0', sdkStage: '1000',
-    sdkVersion: '8.6.2', sdkVersionId: 8060299,
-    session: sessionId, sessionCounter: 1, sessionInMegaCounter: 1,
-    swInstallationId: swInstall,
-    tester: '0',
-    totalLtvGameFailure: 0, totalLtvGameSession: 1,
-    totalNetoPlaytime: sessionDur,
-    totalRevenue: 'xphXAQaAY9yokqYj8UOgjA==',
-    unityIdfi: unityIdfi, unityPlayerId: unityPlayer, unityUserId: unityUser,
-    unityVersion: '6000.3.12',
-    uuid: idfa, version: '3.0.1'
+    uuid:        idfa,
+    idfv:        idfv,
+    bundle:      bundle,
+    clientTs:    now,
+    eventId:     genUUID(true),
+    eventName:   'Progress',
+    custom1:     'LevelCompleted',
+    custom2:     String(levelNum),
+    custom3:     '1',
+    levelNumber: levelNum,
+    mainLevel:   levelNum,
+    gameplayProgressType: 'LevelCompleted',
+    gameplayType: 'Level',
+    gameId:      gameId,
+    gameName:    'Screw Guru',
+    gameSessionId:            gameSessionId,
+    gameSessionStartTs:       now - sessionDur * 1000,
+    gameSessionDurationNetto: sessionDur,
+    gameSessionDurationBrutto: sessionDur,
+    session:     sessionId,
+    megaSessionId: megaSessionId,
+    os:          'IPhonePlayer',
+    osVer:       'iOS ' + iosver,
+    device:      'iPhone10,6',
+    sdkVersion:  '8.6.2',
+    sdkVersionId: 8060299,
+    version:     '3.0.1',
+    sandbox:     '0',
+    tester:      '0',
   };
 
   const payload = { events: [event] };
@@ -1217,13 +1180,8 @@ function openGameUid(devId, siteId, gameId) {
 
   if (gameType === 'af') {
     // Show AF modal
-    document.getElementById('gaf-afid').value      = game?.afId          || '';
-    document.getElementById('gaf-devkey').value    = game?.devKey        || '';
-    document.getElementById('gaf-swinstall').value = game?.swInstallationId || '';
-    document.getElementById('gaf-unityidfi').value = game?.unityIdfi     || '';
-    document.getElementById('gaf-unityplayer').value = game?.unityPlayerId || '';
-    document.getElementById('gaf-unityuser').value = game?.unityUserId   || '';
-    document.getElementById('gaf-conv').value      = game?.conversionData || '';
+    document.getElementById('gaf-afid').value   = game?.afId   || '';
+    document.getElementById('gaf-devkey').value = game?.devKey || '';
     document.getElementById('game-af-ov').classList.add('open');
     setTimeout(()=>document.getElementById('gaf-afid').focus(),80);
   } else {
@@ -1247,23 +1205,11 @@ function saveGameUid() {
   closeGameUid();
 }
 function saveGameAF() {
-  const afId       = document.getElementById('gaf-afid').value.trim();
-  const devKey     = document.getElementById('gaf-devkey').value.trim();
-  const swInstall  = document.getElementById('gaf-swinstall').value.trim();
-  const unityIdfi  = document.getElementById('gaf-unityidfi').value.trim();
-  const unityPlayer= document.getElementById('gaf-unityplayer').value.trim();
-  const unityUser  = document.getElementById('gaf-unityuser').value.trim();
-  const convData   = document.getElementById('gaf-conv').value.trim();
+  const afId   = document.getElementById('gaf-afid').value.trim();
+  const devKey = document.getElementById('gaf-devkey').value.trim();
   if (!afId || !devKey) { alert('AppsFlyer ID و Dev Key مطلوبين'); return; }
   DB.devices.forEach(dev => dev.sites?.forEach(site => site.games?.forEach(game => {
-    if (game.id === _curGameId) {
-      game.afId = afId; game.devKey = devKey;
-      game.swInstallationId = swInstall;
-      game.unityIdfi = unityIdfi;
-      game.unityPlayerId = unityPlayer;
-      game.unityUserId = unityUser;
-      game.conversionData = convData;
-    }
+    if (game.id === _curGameId) { game.afId = afId; game.devKey = devKey; }
   })));
   saveDB();
   closeGameUid();
@@ -1356,18 +1302,15 @@ function addGameFromCatalog(idx) {
 
 <!-- GAME AF MODAL -->
 <div class="ov" id="game-af-ov" onclick="if(event.target===this)closeGameUid()">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-t">🪪 Screw Guru IDs</div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="mf full"><label>AppsFlyer ID</label><input id="gaf-afid" placeholder="مثل: 1779545606506-8148950"></div>
-      <div class="mf full"><label>Dev Key (apiKey)</label><input id="gaf-devkey" placeholder="2XT6AioG658p0W35..."></div>
-      <div class="mf full"><label>swInstallationId</label><input id="gaf-swinstall" placeholder="95d96ad3-3114-411f-98f7..."></div>
-      <div class="mf full"><label>unityIdfi</label><input id="gaf-unityidfi" placeholder="6928D137-F920-43E5..."></div>
-      <div class="mf full"><label>unityPlayerId</label><input id="gaf-unityplayer" placeholder="7tGHCmw8yTdPvtEw..."></div>
-      <div class="mf full"><label>unityUserId</label><input id="gaf-unityuser" placeholder="ff274f67-8aab-942e..."></div>
-      <div class="mf full"><label>conversionData (JSON)</label><textarea id="gaf-conv" rows="3" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px;font-size:11px;font-family:monospace;color:#e2e8f0;resize:none;width:100%" placeholder='{"media_source":"adjoe_int",...}'></textarea></div>
+  <div class="prompt-modal">
+    <div class="prompt-t">🪪 Screw Guru IDs</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">AppsFlyer ID</label>
+      <input id="gaf-afid" placeholder="مثل: 1779545606506-8148950" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;font-family:'Tajawal',sans-serif;color:#e2e8f0;outline:none"></div>
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Dev Key</label>
+      <input id="gaf-devkey" placeholder="2XT6AioG658p0W35..." onkeydown="if(event.key==='Enter')saveGameAF();if(event.key==='Escape')closeGameUid()" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;font-family:'Tajawal',sans-serif;color:#e2e8f0;outline:none"></div>
     </div>
-    <div class="macts">
+    <div class="prompt-acts">
       <button class="btn-ghost" onclick="closeGameUid()">إلغاء</button>
       <button class="btn" onclick="saveGameAF()">💾 حفظ</button>
     </div>
