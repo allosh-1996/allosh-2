@@ -1,9 +1,9 @@
-import json, os, time, hashlib, secrets
+import json, os, time, hashlib, secrets, urllib.request, urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-DATA_FILE = '/home/user/work/allosh_data.json'
-USERS_FILE = '/home/user/work/allosh_users.json'
+DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'allosh_data.json')
+USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
 TOKENS = {}
 
 def load_json(path, default):
@@ -24,13 +24,13 @@ if not os.path.exists(USERS_FILE):
 if not os.path.exists(DATA_FILE):
     save_json(DATA_FILE, {})
 
-with open('/home/user/work/allosh_v2.html') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'index.html')) as f:
     HTML = f.read()
 
 # Build manifest with base64 icons
 import base64
-with open('/home/user/work/icons/icon-192.png','rb') as f: i192 = base64.b64encode(f.read()).decode()
-with open('/home/user/work/icons/icon-512.png','rb') as f: i512 = base64.b64encode(f.read()).decode()
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons/icon-192.png'),'rb') as f: i192 = base64.b64encode(f.read()).decode()
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons/icon-512.png'),'rb') as f: i512 = base64.b64encode(f.read()).decode()
 ICON192 = base64.b64decode(i192)
 ICON512 = base64.b64decode(i512)
 MANIFEST = json.dumps({
@@ -179,6 +179,75 @@ class Handler(BaseHTTPRequestHandler):
             users.append({'username': body['username'], 'password': hash_pw(body['password']), 'role': 'user'})
             save_json(USERS_FILE, users)
             self.send_json(200, {'ok': True})
+        elif p == '/api/mp':
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            token      = body.get('token', '')
+            distinct_id = body.get('distinct_id', '')
+            event      = body.get('event', '')
+            properties = body.get('properties', {})
+            if not token or not distinct_id or not event:
+                return self.send_json(400, {'error': 'Missing fields'})
+            import base64, time as _time
+            properties['token']       = token
+            properties['distinct_id'] = distinct_id
+            properties['time']        = int(_time.time() * 1000)
+            mp_event_id = hashlib.md5(str(_time.time()).encode()).hexdigest()[:8]
+            payload_json = json.dumps([{
+                'event': event,
+                'properties': properties,
+                '$mp_metadata': {
+                    '$mp_event_id': mp_event_id,
+                    '$mp_session_id': mp_event_id,
+                    '$mp_session_seq_id': 1,
+                    '$mp_session_start_sec': int(_time.time())
+                }
+            }])
+            req = urllib.request.Request(
+                'https://api-secure.mixpanel.com/track/?ip=1',
+                data=payload_json.encode(),
+                headers={
+                    'Content-Type': 'application/json',
+                    'Accept': '*/*',
+                    'User-Agent': 'DisneySolitaire/2245 CFNetwork/3826.600.41.2.1 Darwin/24.6.0',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'x-unity-version': '2021.3.56f2'
+                },
+                method='POST'
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    resp_body = resp.read().decode()
+                    self.send_json(resp.status, {'status': resp.status, 'ok': True, 'body': resp_body})
+            except urllib.error.HTTPError as e:
+                body_err = e.read().decode()
+                self.send_json(200, {'status': e.code, 'ok': False, 'error': body_err})
+            except Exception as ex:
+                self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
+        elif p == '/api/af':
+            u = self.get_user()
+            if not u: return self.send_json(401, {'error': 'Unauthorized'})
+            app_id  = body.get('app_id', '')
+            dev_key = body.get('dev_key', '')
+            payload = body.get('payload', {})
+            if not app_id or not dev_key or not payload:
+                return self.send_json(400, {'error': 'Missing app_id, dev_key or payload'})
+            af_url = ('https://api2.appsflyer.com/inappevent/' + app_id).encode()
+            req = urllib.request.Request(
+                'https://api2.appsflyer.com/inappevent/' + app_id,
+                data=json.dumps(payload).encode(),
+                headers={'Content-Type': 'application/json', 'authentication': dev_key},
+                method='POST'
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    self.send_json(resp.status, {'status': resp.status, 'ok': True})
+            except urllib.error.HTTPError as e:
+                body_err = e.read().decode()
+                self.send_json(200, {'status': e.code, 'ok': False, 'error': body_err})
+            except Exception as ex:
+                self.send_json(200, {'status': 0, 'ok': False, 'error': str(ex)})
         else:
             self.send_json(404, {'error': 'Not found'})
 

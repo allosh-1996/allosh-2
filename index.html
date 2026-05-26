@@ -908,26 +908,25 @@ function installApp() {
 
 // ── Run Task → send AF event ──
 async function runTask(taskId, taskName) {
-  // Get game context
   const game = getGame();
   if (!game) return;
 
-  // Get UID for this game
+  // Get distinct_id (Mixpanel) for this game
   const uid = localStorage.getItem('_uid_' + selGame);
   if (!uid) {
-    alert('⚠️ ما في AppsFlyer UID محفوظ لهاللعبة!\nاضغط 🪪 جنب اللعبة وحط الـ UID أول.');
+    alert('⚠️ ما في Mixpanel ID محفوظ لهاللعبة!\nاضغط 🪪 جنب اللعبة وحط الـ distinct_id أول.');
     return;
   }
 
-  // Level number = task name (if numeric)
+  // Level number from task name
   const level = parseInt(taskName);
-  const eventVal = isNaN(level) ? { af_task: taskName } : { af_level: level };
+  const levelNum = isNaN(level) ? taskName : level;
 
-  // Show sending indicator on the dot
+  // Show sending indicator
   const dot = document.querySelector(`[data-action="open-status"][data-tid="${taskId}"]`);
   if (dot) { dot.style.opacity = '0.4'; dot.style.transform = 'scale(0.8)'; }
 
-  const status = await sendAFEvent('af_level_achieved', eventVal, uid);
+  const status = await sendMPEvent('level_complete', levelNum, uid);
 
   if (dot) { dot.style.opacity = ''; dot.style.transform = ''; }
 
@@ -939,27 +938,114 @@ async function runTask(taskId, taskName) {
   }
 }
 
-async function sendAFEvent(eventName, eventValue, advertisingId) {
-  const AF_API = 'https://api2.appsflyer.com/inappevent/' + AF_APP_ID;
+async function sendMPEvent(eventName, level, distinctId, deviceId) {
+  // Get device IDs stored under the current device
+  const ids = JSON.parse(localStorage.getItem('_ids_' + selDev) || '{}');
+  const idfa    = deviceId || ids.idfa   || '';
+  const idfv    = ids.idfv   || '';
+  const iosver  = ids.iosver || '18.7.6';
+
+  const now = new Date();
+  const ts  = now.getTime();
+  const pad = n => String(n).padStart(2,'0');
+  const localStr = `${pad(now.getMonth()+1)}/${pad(now.getDate())}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const tzOff = -(now.getTimezoneOffset() / 60);
+
+  const properties = {
+    token:                       MP_TOKEN,
+    distinct_id:                 distinctId,
+    time:                        ts,
+    mp_lib:                      'client',
+    timestamp_local:             localStr,
+    timezone_offset:             tzOff,
+    library:                     'client',
+    app_version:                 '1.18.1.2245',
+    session_id:                  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    os:                          'iOS ' + iosver,
+    device_model:                'iPhone11,2',
+    device_type:                 'iPhone',
+    device_id:                   idfa,
+    device_language:             'English',
+    IDFA_status:                 'AUTHORIZED',
+    gameplay_state:              'SuperPlay.Domino.Game.States.GameStateMetagame',
+    gameplay_state_breadcrumbs:  'GameStateMetagame',
+    stars_earned:                '2',
+    stars_balance:               '1',
+    coins_balance:               '12232',
+    wilds_balance:               '1',
+    undos_balance:               '1',
+    extra_stock_balance:         '1',
+    free_levels_balance:         '0',
+    coins_balance_in_allowance:  '12.232',
+    movie_area_id:               '1',
+    bonus_area_id:               '0',
+    area_number:                 '1',
+    current_area_name:           'beauty_and_the_beast_ballroom',
+    is_bonus_area:               'False',
+    available_areas:             '80',
+    level_id:                    String(level),
+    bonus_level_id:              '0',
+    user_id:                     distinctId,
+    lifetime_tasks_completed:    '1',
+    current_dcx:                 'V1.18.0 - Low',
+    is_wifi:                     'true',
+    lifetime_net_level_tries:    '2',
+    lifetime_brut_level_tries:   '2',
+    lifetime_purchases:          '0',
+    completed_purchases:         '0',
+    days_from_last_purchase:     'null',
+    coins_allowance:             '1000',
+    game_language:               'English',
+    level_try_count:             '0',
+    is_in_bonus_level_mode:      'False',
+    audio_enabled:               'True',
+    music_enabled:               'True',
+    vibration_enabled:           'False',
+    dtc_ltv:                     '0',
+    dtc_trx:                     '0',
+    days_from_last_dtc:          'null',
+    push_notifications_enabled:  true,
+    ad_watched_lifetime:         '0',
+    ad_revenue_lifetime:         '0',
+    days_since_last_ad_watch:    '-1',
+    rewarded_video_flag:         'False',
+    harvest_cooldown:            60,
+    harvest_multiplier:          1,
+    current_dcx_stack:           ['V1.18.0 - Low','DailyR_HighBalance_LowLevel(994.2716.9993)','Store_v4_dollar_10162025(3922.11440.54868)','ES_Pity_Enabled_fix(4119.12034.1)','C_C(123.240.1616)','C_C(993.2715.9992)','cc - v2(5103.15429.1)','Customer_Support_Provider_Helpshift(8459.27137.1)','Global Parameters CC(2544.7224.1)'],
+    current_dcx_source:          'Cached',
+    dcx_current_revision:        14,
+    current_progress_bar:        'No progress bar active',
+    dynamic_resource_balance:    {'dr-anniversary-ticket-hidden': 0},
+    level_mode:                  '1',
+    level_mode_multiplier:       '1',
+    deactivated:                 'False',
+    facebook_connected:          false,
+    google_connected:            false,
+    gamecenter_connected:        false,
+    apple_connected:             false,
+    is_in_eoc_room:              false,
+    is_clock_cheater:            'False'
+  };
+
   try {
-    const r = await fetch(AF_API, {
+    const r = await fetch('/api/mp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'authentication': AF_DEV_KEY },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
       body: JSON.stringify({
-        appsflyer_id: advertisingId,
-        eventName, eventValue: JSON.stringify(eventValue || {}),
-        eventCurrency: 'USD', ip: '0.0.0.0',
-        eventTime: new Date().toISOString().replace('T',' ').replace('Z','')
+        token:       MP_TOKEN,
+        distinct_id: distinctId,
+        event:       eventName,
+        properties:  properties
       })
     });
-    return r.ok ? r.status : r.status;
+    const data = await r.json();
+    return data.status;
   } catch(e) { return false; }
 }
 // ══════════════════════════════════════
 //  APPSFLYER
 // ══════════════════════════════════════
-const AF_DEV_KEY = '478885444yygy788ihyyuu';
-const AF_APP_ID  = '1779481624061-3266844';
+const MP_TOKEN = '584b45f0bcfdb3605143a47f5f7ac520';
 
 let _curDevId = null, _curGameId = null;
 
@@ -1063,8 +1149,8 @@ function addGameFromCatalog(idx) {
 <!-- GAME UID MODAL -->
 <div class="ov" id="game-uid-ov" onclick="if(event.target===this)closeGameUid()">
   <div class="prompt-modal">
-    <div class="prompt-t">🪪 AppsFlyer UID</div>
-    <input id="gu-uid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" onkeydown="if(event.key==='Enter')saveGameUid();if(event.key==='Escape')closeGameUid()">
+    <div class="prompt-t">🪪 Mixpanel distinct_id</div>
+    <input id="gu-uid" placeholder="مثل: 1IVFG-YCNGO-3NRKO-2LV4A-PHV1R" onkeydown="if(event.key==='Enter')saveGameUid();if(event.key==='Escape')closeGameUid()">
     <div class="prompt-acts">
       <button class="btn-ghost" onclick="closeGameUid()">إلغاء</button>
       <button class="btn" onclick="saveGameUid()">💾 حفظ</button>
