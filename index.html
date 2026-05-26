@@ -341,11 +341,19 @@ const SC = {
 const GAME_CATALOG = [
   {
     name: 'Disney Solitaire',
+    type: 'mp',
     tasks: ['1','2','3','4','6','8','10','12','15','20']
   },
   {
     name: 'Coin Master',
+    type: 'mp',
     tasks: ['3','10','20','40','80','120','160','200','230','260']
+  },
+  {
+    name: 'Screw Guru',
+    type: 'af',
+    bundle: 'com.disassembly.ios.master',
+    tasks: ['1','2','3','4','5','6','7','8','9','10','15','20','25','30']
   }
 ];
 // ══════════════════════════════════════
@@ -906,19 +914,12 @@ function installApp() {
 }
 
 
-// ── Run Task → send AF event ──
+// ── Run Task → dispatch to MP or AF ──
 async function runTask(taskId, taskName) {
   const game = getGame();
   if (!game) return;
 
-  // Get distinct_id from DB
-  const uid = game.uid || '';
-  if (!uid) {
-    alert('⚠️ ما في Mixpanel ID محفوظ لهاللعبة!\nاضغط 🪪 جنب اللعبة وحط الـ distinct_id أول.');
-    return;
-  }
-
-  // Level number from task name
+  const gameType = game.type || 'mp';
   const level = parseInt(taskName);
   const levelNum = isNaN(level) ? taskName : level;
 
@@ -926,12 +927,38 @@ async function runTask(taskId, taskName) {
   const dot = document.querySelector(`[data-action="open-status"][data-tid="${taskId}"]`);
   if (dot) { dot.style.opacity = '0.4'; dot.style.transform = 'scale(0.8)'; }
 
-  const status = await sendMPEvent('level_complete', levelNum, uid);
+  let status = false;
+
+  if (gameType === 'af') {
+    // AppsFlyer flow
+    const dev = DB.devices.find(d => d.id === selDev);
+    const ids = dev?.ids || {};
+    const idfa = ids.idfa || '';
+    const afId = game.afId || '';
+    const devKey = game.devKey || '';
+    const bundle = game.bundle || '';
+
+    if (!idfa || !afId || !devKey || !bundle) {
+      if (dot) { dot.style.opacity = ''; dot.style.transform = ''; }
+      alert('⚠️ ناقص معلومات AppsFlyer!\nاضغط 🪪 جنب اللعبة وحط:\n- AppsFlyer ID\n- Dev Key\n- IDFA بالجهاز');
+      return;
+    }
+    status = await sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids);
+  } else {
+    // Mixpanel flow
+    const mpUid = game.uid || '';
+    if (!mpUid) {
+      if (dot) { dot.style.opacity = ''; dot.style.transform = ''; }
+      alert('⚠️ ما في Mixpanel ID محفوظ لهاللعبة!\nاضغط 🪪 جنب اللعبة وحط الـ distinct_id أول.');
+      return;
+    }
+    status = await sendMPEvent('level_complete', levelNum, mpUid);
+  }
 
   if (dot) { dot.style.opacity = ''; dot.style.transform = ''; }
 
   const task = game.tasks.find(t => t.id === taskId);
-  if (status === 200) {
+  if (status === 200 || status === true) {
     if (task) { task.status = 'credited'; saveDB(); renderContent(); }
   } else {
     if (task) { task.status = 'notcredited'; saveDB(); renderContent(); }
@@ -1048,6 +1075,128 @@ async function sendMPEvent(eventName, level, distinctId, deviceId) {
 // ══════════════════════════════════════
 const MP_TOKEN = '584b45f0bcfdb3605143a47f5f7ac520';
 
+async function sendAFEvent(levelNum, idfa, afId, devKey, bundle, ids) {
+  const idfv   = ids.idfv   || idfa;
+  const iosver = ids.iosver || '18.5';
+  const now    = Date.now();
+
+  // Generate UUIDs
+  function genUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random()*16|0;
+      return (c==='x' ? r : (r&0x3|0x8)).toString(16).toUpperCase();
+    });
+  }
+
+  const gameSessionId  = genUUID();
+  const megaSessionId  = genUUID();
+  const sessionId      = genUUID();
+  const sessionDur     = Math.floor(Math.random() * 20) + 20; // 20-40 sec
+
+  const payload = {
+    appsflyer_id:    afId,
+    advertising_id:  idfa,
+    idfa:            idfa,
+    idfv:            idfv,
+    customer_user_id: idfa,
+    ip:              '172.58.50.172',
+    eventName:       'Progress',
+    eventValue:      JSON.stringify({
+      custom1:                  'LevelCompleted',
+      custom2:                  String(levelNum),
+      custom3:                  '1',
+      custom4:                  '',
+      custom5:                  '0',
+      custom6:                  '',
+      levelNumber:              levelNum,
+      mainLevel:                levelNum,
+      gameplayProgressType:     'LevelCompleted',
+      gameplayType:             'Level',
+      levelType:                'Regular',
+      previousLevelType:        'Regular',
+      previousLevelTypeNumber:  levelNum,
+      attempt:                  1,
+      levelAttempts:            1,
+      levelRevives:             0,
+      gameSessionId:            gameSessionId,
+      gameSessionStartTs:       now - sessionDur * 1000,
+      gameSessionDurationNetto: sessionDur,
+      gameSessionDurationBrutto: sessionDur,
+      megaSessionId:            megaSessionId,
+      megaSessionCounter:       1,
+      megaNetoPlaytime:         sessionDur,
+      megaPlaytime:             sessionDur,
+      session:                  sessionId,
+      sessionCounter:           1,
+      sessionInMegaCounter:     1,
+      clientTs:                 now,
+      balanceHc:                375,
+      balanceSoftA:             0,
+      balanceSoftB:             0,
+      activeDay:                2,
+      totalNetoPlaytime:        sessionDur + 10,
+      totalLtvGameSession:      1,
+      totalLtvGameFailure:      0,
+      isTimeBasedGame:          0,
+      noAds:                    '0',
+      sandbox:                  '0',
+      tester:                   '0',
+      deeplink:                 '0',
+      adsFreeZoneEnabled:       0,
+      sdkStage:                 '1000',
+      sdkVersion:               '8.6.2',
+      sdkVersionId:             8060299,
+      installSdkVersion:        '8.6.2',
+      installSdkVersionId:      8060299,
+      os:                       'IPhonePlayer',
+      osVer:                    'iOS ' + iosver,
+      device:                   'iPhone12,3',
+      unityVersion:             '6000.3.12',
+      version:                  '3.0.1',
+      installAppVersion:        '3.0.1',
+      installAppVersionId:      3000199,
+      bundle:                   bundle,
+      gameName:                 'Screw Guru',
+      mediationName:            'Max',
+      averageFps:               29,
+      medianFps:                29,
+      samplesCount:             15,
+      criticalFpsDuration:      0,
+      criticalMinFps:           -1,
+      fpsMeasurementDuration:   14.5,
+      configStatus:             'Remote',
+      abId:                     '',
+      abName:                   '',
+      abVariant:                '',
+      feature:                  '',
+      featureVersion:           0,
+      products:                 '',
+      prevOrgId:                '',
+      extra: {
+        connection:       'wifi',
+        country:          'US',
+        dpi:              '458',
+        lang:             'en',
+        resolutionHeight: '2436',
+        resolutionWidth:  '1125'
+      }
+    }),
+    eventCurrency:   'USD',
+    af_events_api:   true,
+    att:             3
+  };
+
+  try {
+    const r = await fetch('/api/af', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify({ app_id: bundle, dev_key: devKey, payload })
+    });
+    const data = await r.json();
+    return data.status || (data.ok ? 200 : 0);
+  } catch(e) { return 0; }
+}
+
 let _curDevId = null, _curGameId = null;
 
 // Device IDs modal
@@ -1077,24 +1226,48 @@ function saveDevIds() {
   render();
 }
 
-// Game UID modal
+// Game UID modal — handles both MP and AF
 function openGameUid(devId, siteId, gameId) {
   _curGameId = gameId;
   const game = DB.devices.find(d=>d.id===devId)?.sites?.find(s=>s.id===siteId)?.games?.find(g=>g.id===gameId);
-  document.getElementById('gu-uid').value = game?.uid || '';
-  document.getElementById('game-uid-ov').classList.add('open');
-  setTimeout(()=>document.getElementById('gu-uid').focus(),80);
+  const gameType = game?.type || 'mp';
+
+  if (gameType === 'af') {
+    // Show AF modal
+    document.getElementById('gaf-afid').value   = game?.afId   || '';
+    document.getElementById('gaf-devkey').value = game?.devKey || '';
+    document.getElementById('game-af-ov').classList.add('open');
+    setTimeout(()=>document.getElementById('gaf-afid').focus(),80);
+  } else {
+    // Show MP modal
+    document.getElementById('gu-uid').value = game?.uid || '';
+    document.getElementById('game-uid-ov').classList.add('open');
+    setTimeout(()=>document.getElementById('gu-uid').focus(),80);
+  }
 }
-function closeGameUid() { document.getElementById('game-uid-ov').classList.remove('open'); }
+function closeGameUid() {
+  document.getElementById('game-uid-ov').classList.remove('open');
+  document.getElementById('game-af-ov').classList.remove('open');
+}
 function saveGameUid() {
   const uid = document.getElementById('gu-uid').value.trim();
   if (!uid) { alert('UID مطلوب'); return; }
-  // Save to DB under the game
   DB.devices.forEach(dev => dev.sites?.forEach(site => site.games?.forEach(game => {
     if (game.id === _curGameId) game.uid = uid;
   })));
   saveDB();
   closeGameUid();
+}
+function saveGameAF() {
+  const afId   = document.getElementById('gaf-afid').value.trim();
+  const devKey = document.getElementById('gaf-devkey').value.trim();
+  if (!afId || !devKey) { alert('AppsFlyer ID و Dev Key مطلوبين'); return; }
+  DB.devices.forEach(dev => dev.sites?.forEach(site => site.games?.forEach(game => {
+    if (game.id === _curGameId) { game.afId = afId; game.devKey = devKey; }
+  })));
+  saveDB();
+  closeGameUid();
+  render();
 }
 
 // ── Game Catalog ──
@@ -1125,6 +1298,8 @@ function addGameFromCatalog(idx) {
   const newGame = {
     id: uid(),
     name: g.name,
+    type: g.type || 'mp',
+    bundle: g.bundle || '',
     tasks: g.tasks.map(name => ({ id: uid(), name, status: 'pending', cid: '', sdid: '', install: '', notes: '' }))
   };
   site.games.push(newGame);
@@ -1175,6 +1350,29 @@ function addGameFromCatalog(idx) {
     <div style="display:flex;flex-direction:column;gap:8px" id="catalog-list"></div>
     <div class="macts" style="margin-top:14px">
       <button class="btn-ghost" onclick="closeCatalog()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME AF MODAL -->
+<div class="ov" id="game-af-ov" onclick="if(event.target===this)closeGameUid()">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-t">🪪 AppsFlyer IDs — Screw Guru</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="mf full">
+        <label>AppsFlyer ID</label>
+        <input id="gaf-afid" placeholder="مثل: 1779666047656-8474371"
+          onkeydown="if(event.key==='Escape')closeGameUid()">
+      </div>
+      <div class="mf full">
+        <label>Dev Key</label>
+        <input id="gaf-devkey" placeholder="مثل: 2XT6AioG658p0W35..."
+          onkeydown="if(event.key==='Enter')saveGameAF();if(event.key==='Escape')closeGameUid()">
+      </div>
+    </div>
+    <div class="macts">
+      <button class="btn-ghost" onclick="closeGameUid()">إلغاء</button>
+      <button class="btn" onclick="saveGameAF()">💾 حفظ</button>
     </div>
   </div>
 </div>
